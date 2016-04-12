@@ -13,7 +13,7 @@ class Instruction {
     var id      : UInt8
     var instMsg :[UInt8]
     
-    init (request: [UInt8], id: UInt8) {
+    init (request: [UInt8] = [0], id: UInt8 = 0) {
         let len = request.count
         let tempLen: UInt8 = 0x00
         let max: UInt8 = 0x60

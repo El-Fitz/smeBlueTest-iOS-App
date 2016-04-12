@@ -30,14 +30,14 @@ class ViewController: UIViewController, CBCentralManagerDelegate, CBPeripheralDe
 	                			                 		   "Pressure": 0,
 	                			                 		   "Humidity": 0,
 	                			                 		   "Time": 0]
-	var instruction				: [UInt8]						= [0]
 	var sentInstruction		: Bool							= false
 	var receivedMessge		: Bool							= false
 	var confirmationValid : Bool							= false
-	var sentStr						: [UInt8]						= [0x53, 0x65, 0x6e, 0x74, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67]
+	var sentStr						: [UInt8]						= [0x53, 0x65, 0x6e, 0x74, 0x20, 0x73, 0x74]
 	var strSent						: Bool							= false
 	var strConfirmation		: Bool							= false
-	var writtenStr				: [UInt8]						= [0x57, 0x72, 0x69, 0x74, 0x74, 0x65, 0x6e, 0x20, 0x53, 0x74, 0x72, 0x69, 0x6e, 0x67]
+	var writtenStr				: [UInt8]						= [0x57, 0x72, 0x69, 0x74, 0x74, 0x65, 0x6e]
+	var instruction				: Instruction!
 	var bleCentralManager	: CBCentralManager!
 	var smePeripheral			: CBPeripheral!
 	var smeInfo						: SmeBleDevice!
@@ -52,6 +52,7 @@ class ViewController: UIViewController, CBCentralManagerDelegate, CBPeripheralDe
 		cryptoKey = CryptoKeyModel()
 		authToken	= SelfAuthenticator(key: cryptoKey)
 		bleCentralManager = CBCentralManager(delegate: self, queue: nil)
+		instruction = Instruction()
 	}
 	
 	override func didReceiveMemoryWarning() {
@@ -104,6 +105,8 @@ class ViewController: UIViewController, CBCentralManagerDelegate, CBPeripheralDe
 	// If disconnected, start searching again
 	func centralManager(central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: NSError?) {
 		self.statusLabel.text = "Disconnected"
+		instruction.id = 0x00
+		authToken.updateStatus(0x00)
 		central.scanForPeripheralsWithServices(nil, options: nil)
 	}
 	
@@ -149,32 +152,68 @@ class ViewController: UIViewController, CBCentralManagerDelegate, CBPeripheralDe
 		
 		var valuesIndexKey: String
 		var indexKey: UInt8
-		var counter = 1
+		var counter = 0
 		var msg = SmeBleDevice.dataToUnisgnedBytes8(characteristic.value!)
 		let len = msg.count
 		
 		self.statusLabel.text = "Connected"
 		
 		while (counter < len) {
-			switch msg[counter] {
-				case 0x21:
-						confirmationValid = SmeBleDevice.checkConfirmation(msg, instruction: instruction)
-						counter += len
-						break
-				case 0x74, 0x70, 0x68, 0x64:
-						indexKey = msg[counter]
-						valuesIndexKey = SmeBleDevice.rxKeysToWords(indexKey)
-						sensorValues[valuesIndexKey] = msg[counter + 1]
+			if (msg[counter] == 0x65) {
+				instruction.id = (msg[counter + 2])
+				authToken.updateStatus(msg[counter + 2])
+				counter += 2
+			} else {
+				counter += 1
+				switch msg[counter] {
+						case 0x21:
+							confirmationValid = SmeBleDevice.checkConfirmation(msg, instruction: instruction.instMsg)
+							counter += len
+								break
+						case 0x74, 0x70, 0x68, 0x64:
+							indexKey = msg[counter]
+							valuesIndexKey = SmeBleDevice.rxKeysToWords(indexKey)
+							sensorValues[valuesIndexKey] = msg[counter + 1]
+							counter += 2
+								break
+						default :
+							if strSent && (sentStr.count) == (Int)(msg.last!) {
+								msg.removeLast()
+								if strSent && sentStr == msg {
+									strConfirmation = true
+								}
+							}
+								break
+				}
+			}
+		}
+	}
+	
+	// Authenticate with the SmartEverything device
+	func authenticate() {
+		
+	}
+	
+	// Send instructions to SmartEverything device
+	func sendInstruction(request: [UInt8], str: [UInt8] = [0]) {
+		var counter	: Int = 0
+		var len			: Int
+		
+		len  = request.count
+		instruction.instMsg.removeAll()
+		if (authToken.authenticated == false || instruction.id == 0x00) {
+			
+		}
+		while (counter < len) {
+			switch request[counter] {
+				case 0x53, 0x50, 0x44:
+						instruction.instMsg.append(request[counter])
+						instruction.instMsg.append(request[counter + 1])
 						counter += 2
 						break
-			default :
-				if strSent && (sentStr.count) == (Int)(msg.last!) {
-					msg.removeLast()
-					if strSent && sentStr == msg {
-						strConfirmation = true
-					}
-				}
-				break
+				default :
+						counter += 1
+						break
 			}
 		}
 	}

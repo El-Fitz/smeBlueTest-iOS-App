@@ -32,10 +32,10 @@ class SmeBleDevice {
     
     
     // Return Device Name
-    
     class func getDeviceName() -> String {
         return name
     }
+    
     // Check name of device from advertisement data
     class func deviceFound (advertisementData: [NSObject : AnyObject]!) -> Bool {
         let nameOfDeviceFound = (advertisementData as NSDictionary).objectForKey(CBAdvertisementDataLocalNameKey) as? NSString
@@ -50,7 +50,6 @@ class SmeBleDevice {
         return false
     }
 
-    
     // Return stored sensor value
     class func getSensorValue(inout sensorValues: [String: UInt8], key: String) -> UInt8 {
         if (sensorValues.indexForKey(key) != nil) {
@@ -90,5 +89,20 @@ class SmeBleDevice {
             return true
         }
         return false
+    }
+    
+    class func isValidInstruction(instruction: UInt8, param: UInt8 = 0) -> Bool {
+        switch instruction {
+        case 0x53, 0x50 :
+            if rxDictionnary.keys.contains(param) {
+                return true
+            } else {
+                return false
+            }
+        case 0x57, 0x44, 0x55, 0x45:
+            return true
+        default:
+            return false
+        }
     }
 }

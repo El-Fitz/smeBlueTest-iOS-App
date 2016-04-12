@@ -12,6 +12,7 @@ class SelfAuthenticator {
 	var len		: UInt8 = 0x62
     var authKey	:[UInt8]
 	var authMsg	:[UInt8]
+	var authenticated : Bool = false
 	
     init (key: CryptoKeyModel = CryptoKeyModel()) {
 		self.authKey = key.getKey()
@@ -30,6 +31,14 @@ class SelfAuthenticator {
 	}
 	func getAuthMsg() -> [UInt8] {
 		return authMsg
+	}
+	
+	func updateStatus(status: UInt8) {
+		if status == 0x00 {
+			authenticated = false
+		} else {
+			authenticated = true
+		}
 	}
 }
 
