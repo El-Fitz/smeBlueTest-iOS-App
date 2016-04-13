@@ -84,6 +84,12 @@ class SmeBleDevice {
         return array
     }
     
+    //Convert String to an array of UInt8 bytes
+    class func strToUnisgnedBytes8(value : String) -> [UInt8] {
+        let array : [UInt8] = Array(value.utf8)
+        return array
+    }
+    
     class func checkConfirmation(confirmation: [UInt8], instruction: [UInt8]) -> Bool {
         if confirmation.dropFirst() == instruction.dropFirst(4) {
             return true

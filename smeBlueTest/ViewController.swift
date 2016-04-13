@@ -24,25 +24,38 @@ class ViewController: UIViewController, CBCentralManagerDelegate, CBPeripheralDe
 	@IBOutlet weak var humData: UILabel!
 	@IBOutlet weak var tempData: UILabel!
 	@IBOutlet weak var pressureData: UILabel!
+	
+	//Action buttons
+	@IBOutlet weak var updateTemp: UIButton!
+	@IBOutlet weak var updatePressure: UIButton!
+	@IBOutlet weak var updateHumidity: UIButton!
+	@IBOutlet weak var updateAll: UIButton!
+	@IBOutlet weak var updateString: UIButton!
+	@IBOutlet weak var sendPayload: UIButton!
+	
+	//String field
+	@IBOutlet weak var strField: UILabel!
 
 
-	var sensorValues			: [String: UInt8]		= ["Temperature": 0,
+	var sensorValues					: [String: UInt8]		= ["Temperature": 0,
 	                			                 		   "Pressure": 0,
 	                			                 		   "Humidity": 0,
 	                			                 		   "Time": 0]
-	var sentInstruction		: Bool							= false
-	var receivedMessge		: Bool							= false
-	var confirmationValid : Bool							= false
-	var sentStr						: [UInt8]						= [0x53, 0x65, 0x6e, 0x74, 0x20, 0x73, 0x74]
-	var strSent						: Bool							= false
-	var strConfirmation		: Bool							= false
-	var writtenStr				: [UInt8]						= [0x57, 0x72, 0x69, 0x74, 0x74, 0x65, 0x6e]
-	var instruction				: Instruction!
-	var bleCentralManager	: CBCentralManager!
-	var smePeripheral			: CBPeripheral!
-	var smeInfo						: SmeBleDevice!
-	var cryptoKey					: CryptoKeyModel!
-	var authToken					: SelfAuthenticator!
+	var sensorLabels					: [String: UILabel]?
+	var sentInstruction				: Bool							= false
+	var receivedMessge				: Bool							= false
+	var confirmationValid			: Bool							= false
+	var sentStr								: [UInt8]						= [0x53, 0x65, 0x6e, 0x74, 0x20, 0x73, 0x74]
+	var strSent								: Bool							= false
+	var strConfirmation				: Bool							= false
+	var writtenStr						: [UInt8]						= [0x57, 0x72, 0x69, 0x74, 0x74, 0x65, 0x6e]
+	var instruction						: Instruction!
+	var bleCentralManager			: CBCentralManager!
+	var smePeripheral					: CBPeripheral!
+	var smePeripheralWriteChar: CBCharacteristic?
+	var smeInfo								: SmeBleDevice!
+	var cryptoKey							: CryptoKeyModel!
+	var authToken							: SelfAuthenticator!
 
 	
 	override func viewDidLoad() {
@@ -53,11 +66,155 @@ class ViewController: UIViewController, CBCentralManagerDelegate, CBPeripheralDe
 		authToken	= SelfAuthenticator(key: cryptoKey)
 		bleCentralManager = CBCentralManager(delegate: self, queue: nil)
 		instruction = Instruction()
+		sensorLabels = ["Temperature": tempData, "Pressure": pressureData, "Humdity": humData]
+		if (authToken.authenticated == true) {
+			_ = NSTimer.scheduledTimerWithTimeInterval(60.0, target: self, selector: Selector(sendInstruction([0x50])), userInfo: nil, repeats: true)
+		}
 	}
 	
 	override func didReceiveMemoryWarning() {
 		super.didReceiveMemoryWarning()
+		
+		
   // Dispose of any resources that can be recreated.
+	}
+	
+	@IBAction func sendPayloadFun(sender: AnyObject) {
+		sendInstruction([0x45])
+	}
+	@IBAction func updatePressureFun(sender: AnyObject) {
+		sendInstruction([0x53,0x70])
+	}
+	@IBAction func updateStrFun(sender: AnyObject) {
+		writtenStr = SmeBleDevice.strToUnisgnedBytes8(strField.text!)
+		sendInstruction([0x57])
+	}
+	@IBAction func updateHumidityFun(sender: AnyObject) {
+		sendInstruction([0x53,0x74,0x53,0x68,0x53,0x70])
+	}
+	@IBAction func updateAllFun(sender: AnyObject) {
+		sendInstruction([0x53,0x68])
+	}
+	@IBAction func updateTempFun(sender: AnyObject) {
+		sendInstruction([0x53,0x74])
+	}
+	
+	
+	func valueToString (type: UInt8, val: UInt8) -> String {
+		switch type {
+		case 0x74: return "\(val) ˚C"
+		case 0x70: return "\((Int)(val) + 1000) mbar"
+		case 0x64: return "\(val) %"
+		default : return ""
+		}
+	}
+	
+	// Send instructions to SmartEverything device
+	func sendInstruction(request: [UInt8]) {
+		let seconds = 5.0
+		let delay = seconds * Double(NSEC_PER_SEC)  // nanoseconds per seconds
+		let dispatchTime = dispatch_time(DISPATCH_TIME_NOW, Int64(delay))
+		var counter	: Int = 0
+		var len			: Int
+		var strLen	: UInt8
+		
+		len  = request.count
+		instruction.instMsg.removeAll()
+		// If not yet authenticated with the SmartEverything Device, authenticate
+		while (authToken.authenticated == false || instruction.id == 0x00 && counter < 10) {
+			instruction.instMsg = authToken.authMsg
+			sendToSMEDevice()
+			dispatch_after(dispatchTime, dispatch_get_main_queue(), {
+				counter += 1
+			})
+		}
+		counter = 0
+		instruction.instMsg.append(instruction.id)
+		while (counter < len) {
+			switch request[counter] {
+			case 0x53, 0x50:
+				instruction.instMsg.append(request[counter])
+				instruction.instMsg.append(request[counter + 1])
+				counter += 2
+				break
+			case 0x44, 0x45, 0x70:
+				instruction.instMsg.append(request[counter])
+				counter += 1
+				break
+			case 0x57:
+				instruction.instMsg.append(request[counter])
+				strLen = (UInt8)(writtenStr.count)
+				if (strLen < 8) {
+					instruction.instMsg.append((UInt8)(strLen))
+					sentStr = writtenStr
+				} else {
+					instruction.instMsg.append(7)
+					sentStr += writtenStr.prefix(7)
+				}
+				instruction.instMsg += sentStr
+				counter += (Int)(strLen)
+				break
+			default :
+				counter += 1
+				break
+			}
+		}
+		instruction.instMsg.insert((UInt8)(instruction.instMsg.count - 2), atIndex: 0)
+		instruction.instMsg.insert(0x21, atIndex: 0)
+		instruction.instMsg.insert(instruction.instMsg[1] + 2, atIndex: 0)
+		sendToSMEDevice()
+	}
+	
+	func sendToSMEDevice() {
+		// See if characteristic has been discovered before writing to it
+		if let writeCharacteristic = self.smePeripheralWriteChar {
+			// Need a mutable var to pass to writeValue function
+			let data = NSData(bytes: instruction.instMsg, length: sizeof(UInt8))
+			self.smePeripheral?.writeValue(data, forCharacteristic: writeCharacteristic, type: CBCharacteristicWriteType.WithResponse)
+		}
+	}
+	
+	// Get data values when they are updated
+	func peripheral(peripheral: CBPeripheral, didUpdateValueForCharacteristic characteristic: CBCharacteristic, error: NSError?) {
+		
+		var valuesIndexKey: String
+		var indexKey: UInt8
+		var counter = 0
+		var msg = SmeBleDevice.dataToUnisgnedBytes8(characteristic.value!)
+		let len = msg.count
+		
+		self.statusLabel.text = "Connected"
+		
+		while (counter < len) {
+			if (msg[counter] == 0x65) {
+				instruction.id = (msg[counter + 2])
+				authToken.updateStatus(msg[counter + 2])
+				counter += 2
+			} else {
+				counter += 1
+				switch msg[counter] {
+				case 0x21:
+					confirmationValid = SmeBleDevice.checkConfirmation(msg, instruction: instruction.instMsg)
+					counter += len
+					break
+				case 0x74, 0x70, 0x68, 0x64:
+					indexKey = msg[counter]
+					valuesIndexKey = SmeBleDevice.rxKeysToWords(indexKey)
+					sensorValues[valuesIndexKey] = msg[counter + 1]
+					sensorLabels![valuesIndexKey]?.text = valueToString(msg[counter], val: msg[counter + 1])
+					counter += 2
+					break
+				default :
+					if strSent && (sentStr.count) == (Int)(msg.last!) {
+						msg.removeLast()
+						if strSent && sentStr == msg {
+							strConfirmation = true
+						}
+					}
+					break
+				}
+			}
+		}
 	}
 	
 // The original code for the Bluetooth part, aside from a few minor modifications,
@@ -126,6 +283,8 @@ class ViewController: UIViewController, CBCentralManagerDelegate, CBPeripheralDe
 		}
 	}
 	
+	
+	
 	// Enable notification and sensor for each characteristic of valid service
 	func peripheral(peripheral: CBPeripheral, didDiscoverCharacteristicsForService service: CBService, error: NSError?) {
 		
@@ -141,79 +300,9 @@ class ViewController: UIViewController, CBCentralManagerDelegate, CBPeripheralDe
 				self.smePeripheral.setNotifyValue(true, forCharacteristic: thisCharacteristic)
 			}
 			if SmeBleDevice.validUUID(thisCharacteristic.UUID.UUIDString) {
-				// Enable Sensor
+				// Enable Write
+				self.smePeripheralWriteChar = thisCharacteristic
 				self.smePeripheral.writeValue(enablyBytes, forCharacteristic: thisCharacteristic, type: CBCharacteristicWriteType.WithResponse)
-			}
-		}
-	}
-	
-	// Get data values when they are updated
-	func peripheral(peripheral: CBPeripheral, didUpdateValueForCharacteristic characteristic: CBCharacteristic, error: NSError?) {
-		
-		var valuesIndexKey: String
-		var indexKey: UInt8
-		var counter = 0
-		var msg = SmeBleDevice.dataToUnisgnedBytes8(characteristic.value!)
-		let len = msg.count
-		
-		self.statusLabel.text = "Connected"
-		
-		while (counter < len) {
-			if (msg[counter] == 0x65) {
-				instruction.id = (msg[counter + 2])
-				authToken.updateStatus(msg[counter + 2])
-				counter += 2
-			} else {
-				counter += 1
-				switch msg[counter] {
-						case 0x21:
-							confirmationValid = SmeBleDevice.checkConfirmation(msg, instruction: instruction.instMsg)
-							counter += len
-								break
-						case 0x74, 0x70, 0x68, 0x64:
-							indexKey = msg[counter]
-							valuesIndexKey = SmeBleDevice.rxKeysToWords(indexKey)
-							sensorValues[valuesIndexKey] = msg[counter + 1]
-							counter += 2
-								break
-						default :
-							if strSent && (sentStr.count) == (Int)(msg.last!) {
-								msg.removeLast()
-								if strSent && sentStr == msg {
-									strConfirmation = true
-								}
-							}
-								break
-				}
-			}
-		}
-	}
-	
-	// Authenticate with the SmartEverything device
-	func authenticate() {
-		
-	}
-	
-	// Send instructions to SmartEverything device
-	func sendInstruction(request: [UInt8], str: [UInt8] = [0]) {
-		var counter	: Int = 0
-		var len			: Int
-		
-		len  = request.count
-		instruction.instMsg.removeAll()
-		if (authToken.authenticated == false || instruction.id == 0x00) {
-			
-		}
-		while (counter < len) {
-			switch request[counter] {
-				case 0x53, 0x50, 0x44:
-						instruction.instMsg.append(request[counter])
-						instruction.instMsg.append(request[counter + 1])
-						counter += 2
-						break
-				default :
-						counter += 1
-						break
 			}
 		}
 	}

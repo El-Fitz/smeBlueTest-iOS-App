@@ -9,6 +9,7 @@
 
 class SelfAuthenticator {
 	let authVal	: UInt8 = 0x4b
+	let msgNb	: UInt8 = 0xff
 	var len		: UInt8 = 0x62
     var authKey	:[UInt8]
 	var authMsg	:[UInt8]
@@ -16,9 +17,10 @@ class SelfAuthenticator {
 	
     init (key: CryptoKeyModel = CryptoKeyModel()) {
 		self.authKey = key.getKey()
-        self.len = 0x062
+        self.len = (UInt8)(self.authKey.count) + 3
         self.authMsg = [self.len]
         self.authMsg += [authVal]
+		self.authMsg += [msgNb]
         self.authMsg += self.authKey
 		key.newKey = false
     }

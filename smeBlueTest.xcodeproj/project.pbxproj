@@ -7,8 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		032738541CBC7E57000FE693 /* CoreBluetooth.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 032738531CBC7E57000FE693 /* CoreBluetooth.framework */; };
 		038330EA1CBC4B9C00F4EF98 /* SmeBleDeviceModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 038330E91CBC4B9C00F4EF98 /* SmeBleDeviceModel.swift */; };
+		03A716E21CBDFD220096D6C6 /* CoreBluetooth.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 032738531CBC7E57000FE693 /* CoreBluetooth.framework */; };
 		03B055C01CBAC50800F0C539 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B055BF1CBAC50800F0C539 /* AppDelegate.swift */; };
 		03B055C21CBAC50800F0C539 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03B055C11CBAC50800F0C539 /* ViewController.swift */; };
 		03B055C51CBAC50800F0C539 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 03B055C31CBAC50800F0C539 /* Main.storyboard */; };
@@ -64,7 +64,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				032738541CBC7E57000FE693 /* CoreBluetooth.framework in Frameworks */,
+				03A716E21CBDFD220096D6C6 /* CoreBluetooth.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
